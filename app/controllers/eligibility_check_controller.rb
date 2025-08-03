@@ -26,6 +26,7 @@ class EligibilityCheckController < ApplicationController
         first_name: params[:first_name],
         last_name: params[:last_name],
         zip: params[:zip],
+        group_number: params[:group_number],
         dob: params[:dob]
         }
 
@@ -39,10 +40,41 @@ class EligibilityCheckController < ApplicationController
     request["Authorization"] = "Bearer #{bearer_token}"
 
     response = http.request(request)
+    @data = JSON.parse(response.body)
+    if response.code == "200"
+      @active = true
+      save_or_update_member
+      render json: @member
+    else
+      @active = false
+      @member = Member.find_by(external_member_id: @params[:external_member_id])
+      @member.update(
+        active: false,
+        terminated_at: Time.current
+      )
+      render json: @data && @member
+    end
+    create_elig_check_record
+  end
 
-    puts "Response Code: #{response.code}"
-    puts "Response Body: #{response.body}"
+  private
+  def save_or_update_member
+    @member = Member.find_or_initialize_by(external_member_id: @data[:external_member_id] || @data[:first_name] && @data[:last_name] && @data[:dob] && @data[:zip])
+    @member.external_member_id = @data["external_member_id"]
+    @member.first_name = @data["first_name"]
+    @member.last_name = @data["last_name"]
+    @member.zip = @data["zip"]
+    @member.group_number = @data["group_number"]
+    @member.dob = @data["dob"]
+    @member.active = true,
+    @member.terminated_at = nil
+    @member.save!
+  end
 
-    render json: response.body
+  def create_elig_check_record
+    @eligibility_check = EligibilityCheck.create!(
+      member_id: @member.id,
+      active: @active
+    )
   end
 end
