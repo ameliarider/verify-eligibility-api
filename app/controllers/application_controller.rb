@@ -1,7 +1,7 @@
-class ApplicationController < ActionController::API
+class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception, unless: -> { request.format.json? }
 
-    helper_method :current_user
+  helper_method :current_user
 
   skip_before_action :verify_authenticity_token
 
